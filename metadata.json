@@ -1,0 +1,8 @@
+{
+  "name": "FitFlow AK",
+  "description": "A modern, AI-powered fitness and nutrition tracker.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,110 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>FitFlow AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom scrollbar for webkit */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #475569;
+        border-radius: 3px;
+      }
+      body {
+        background-color: #020617; /* slate-950 */
+        color: #f8fafc;
+        overscroll-behavior-y: none;
+      }
+      /* Running man animation */
+      @keyframes running {
+        0%, 100% { transform: translateY(0) rotate(-5deg); }
+        50% { transform: translateY(-3px) rotate(5deg); }
+      }
+      .running-man {
+        animation: running 0.6s ease-in-out infinite;
+        display: inline-block;
+      }
+      
+      /* Goal Reached Modal Animations */
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+
+      @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      .animate-scaleIn { animation: scaleIn 0.3s ease-out forwards; }
+      
+      @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+      .animate-slideUp { animation: slideUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+      
+      /* Water Slosh Animation */
+      @keyframes wave-slosh {
+        0% { transform: translateX(-50%) rotate(0deg); }
+        33% { transform: translateX(-50%) rotate(3deg); }
+        66% { transform: translateX(-50%) rotate(-3deg); }
+        100% { transform: translateX(-50%) rotate(0deg); }
+      }
+
+      /* Bubble Rise Animation */
+      @keyframes bubble-rise {
+        0% { bottom: 0; opacity: 0; transform: scale(0.5); }
+        20% { opacity: 0.8; }
+        80% { opacity: 0.6; }
+        100% { bottom: 100%; opacity: 0; transform: scale(1.2); }
+      }
+
+      .bubble {
+        position: absolute;
+        width: 3px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        animation: bubble-rise linear infinite;
+      }
+
+      /* Confetti Animation */
+      @keyframes confetti-fall {
+        0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+      }
+      .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: #34d399; /* emerald */
+        animation: confetti-fall 5s linear infinite;
+      }
+      .confetti:nth-child(2) { background-color: #60a5fa; animation-delay: 0.5s; animation-duration: 6s; }
+      .confetti:nth-child(3) { background-color: #facc15; animation-delay: 1s; animation-duration: 4s; }
+      .confetti:nth-child(4) { background-color: #f87171; animation-delay: 1.5s; animation-duration: 5.5s; }
+      .confetti:nth-child(5) { background-color: #a78bfa; animation-delay: 2s; animation-duration: 7s; }
+      .confetti:nth-child(6) { background-color: #34d399; animation-delay: 2.5s; animation-duration: 4.5s; }
+      .confetti:nth-child(7) { background-color: #60a5fa; animation-delay: 3s; animation-duration: 6.5s; }
+      .confetti:nth-child(8) { background-color: #facc15; animation-delay: 3.5s; animation-duration: 3.5s; }
+      .confetti:nth-child(9) { background-color: #f87171; animation-delay: 4s; animation-duration: 5s; }
+      .confetti:nth-child(10) { background-color: #a78bfa; animation-delay: 4.5s; animation-duration: 6s; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
