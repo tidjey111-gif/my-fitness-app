@@ -1,5 +1,4 @@
 
-
 import React, { useState, createContext, useContext, useEffect, ReactNode, useMemo } from 'react';
 import { Home, Dumbbell, Utensils, BarChart3 } from 'lucide-react';
 import { Tab, AppState, MacroGoal, WeightEntry, FoodLog, WorkoutLog, UserProfile, FoodItem, MealType } from './types';
@@ -26,6 +25,7 @@ interface AppContextType extends AppState {
   updateFoodLog: (date: string, log: FoodLog) => void;
   importData: (data: AppState) => void;
   getAllData: () => AppState;
+  updateApiKey: (key: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -57,7 +57,6 @@ const calculatePRDays = (logs: Record<string, WorkoutLog>): Set<string> => {
                     isPR = true;
                 }
                 // Check Rep PR only if weight history exists.
-                // If it's a new max weight, it's already a PR.
                 else if (stats[name].repsByWeight[set.weight] !== undefined) {
                     if (set.reps > stats[name].repsByWeight[set.weight]) {
                         isPR = true;
@@ -84,14 +83,13 @@ const calculatePRDays = (logs: Record<string, WorkoutLog>): Set<string> => {
 };
 
 // --- Helper: Get Local Date ISO String ---
-// Correctly handles timezone offset to return YYYY-MM-DD for the user's local time
 const getLocalToday = () => {
   const d = new Date();
-  const offset = d.getTimezoneOffset() * 60000; // Offset in milliseconds
+  const offset = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - offset).toISOString().split('T')[0];
 };
 
-// --- Initial State (No Mock Data for Weight) ---
+// --- Initial State ---
 const INITIAL_STATE: AppState = {
   userProfile: {
     name: 'Атлет',
@@ -99,8 +97,7 @@ const INITIAL_STATE: AppState = {
     targetDate: '2024-12-31',
   },
   userGoals: { calories: 2500, protein: 180, fat: 80, carbs: 265 },
-  weightHistory: [], // Starts empty
-  // FIX: Remove initial food and workout data for a clean start.
+  weightHistory: [], 
   foodLogs: {},
   workoutLogs: {},
   selectedDate: getLocalToday(),
@@ -113,7 +110,6 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const prDays = useMemo(() => calculatePRDays(state.workoutLogs), [state.workoutLogs]);
 
   useEffect(() => {
-    // Ensure selected date is synced to local today on mount/refresh
     const today = getLocalToday();
     setState(prev => ({ ...prev, selectedDate: today }));
   }, []);
@@ -230,6 +226,12 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       return state;
   };
 
+  const updateApiKey = (key: string) => {
+      localStorage.setItem('gemini_api_key', key);
+      // Simple reload to ensure services pick up the new key from storage
+      window.location.reload();
+  };
+
   return (
     <AppContext.Provider value={{
       ...state,
@@ -248,7 +250,8 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       updateUserProfile,
       updateUserGoals,
       importData,
-      getAllData
+      getAllData,
+      updateApiKey
     }}>
       {children}
     </AppContext.Provider>
