@@ -17,7 +17,7 @@ export interface AnalyzedFood {
 const foodAnalysisSchema = {
   type: Type.OBJECT,
   properties: {
-    foodName: { type: Type.STRING, description: "Name of the food in Russian language" },
+    foodName: { type: Type.STRING, description: "Name of the food in Russian language, including main components (e.g. 'Курица с рисом')" },
     calories: { type: Type.NUMBER },
     protein: { type: Type.NUMBER, description: "in grams" },
     fat: { type: Type.NUMBER, description: "in grams" },
@@ -40,7 +40,7 @@ export const analyzeFoodImage = async (base64Image: string): Promise<AnalyzedFoo
             },
           },
           {
-            text: "Analyze this food image. Identify the main dish. Estimate the calories, protein, fat, and carbs for the portion shown. Return strictly JSON. IMPORTANT: The 'foodName' field MUST be in Russian language.",
+            text: "Analyze this food image. Identify the main dish AND all visible components (side dish, sauce, meat, salad). Calculate the TOTAL combined nutritional values (calories, protein, fat, carbs) for the entire portion shown in the image. Return strictly JSON. IMPORTANT: The 'foodName' field MUST be in Russian language.",
           },
         ],
       },
@@ -68,9 +68,9 @@ export const analyzeFoodText = async (text: string): Promise<AnalyzedFood | null
         parts: [
           {
             text: `Analyze this food description: "${text}". 
-            Identify the main dish. 
-            Estimate the nutritional values (calories, protein, fat, carbs) for the portion described. 
-            If no portion is specified, assume 100 grams.
+            Identify the dish and any mentioned components. 
+            Estimate the TOTAL nutritional values (calories, protein, fat, carbs) for the portion described. 
+            If no portion is specified, assume a standard serving size.
             Return strictly JSON.
             IMPORTANT: The 'foodName' field MUST be in Russian language.`,
           },

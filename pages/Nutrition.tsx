@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../App';
 import { Camera, Search, Plus, X, Loader2, Save, Calendar, ChevronLeft, ChevronRight, Copy, Edit2, Trash2, Check, Utensils, Mic } from 'lucide-react';
@@ -242,6 +243,9 @@ const NutritionPage: React.FC = () => {
       name: '', calories: 0, protein: 0, fat: 0, carbs: 0, grams: 100, mealType: 'breakfast'
   });
 
+  // Keep track of values per 100g to preserve ratios when weight is cleared
+  const [per100g, setPer100g] = useState<{calories: number, protein: number, fat: number, carbs: number} | null>(null);
+
   const [suggestions, setSuggestions] = useState<FoodItem[]>([]);
   
   useEffect(() => {
@@ -265,18 +269,29 @@ const NutritionPage: React.FC = () => {
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) && searchTerm.length > 0
   );
 
+  const calculatePer100g = (item: Partial<FoodItem>) => {
+      const grams = item.grams || 100;
+      if (grams <= 0) return null;
+      return {
+          calories: (item.calories || 0) / grams * 100,
+          protein: (item.protein || 0) / grams * 100,
+          fat: (item.fat || 0) / grams * 100,
+          carbs: (item.carbs || 0) / grams * 100
+      };
+  };
+
   const handleSuggestionClick = (item: FoodItem) => {
       setSearchTerm('');
       setFormData({
           ...item,
           id: undefined,
           mealType: formData.mealType,
-          // Image will be copied if the suggestion has one
       });
+      setPer100g(calculatePer100g(item));
   };
 
   const handleSaveItem = () => {
-      if (!formData.name || !formData.calories) return;
+      if (!formData.name) return;
       const mealType = formData.mealType || 'breakfast';
 
       if (isEditing && formData.id) {
@@ -290,6 +305,7 @@ const NutritionPage: React.FC = () => {
 
   const resetForm = () => {
       setFormData({ name: '', calories: 0, protein: 0, fat: 0, carbs: 0, grams: 100, mealType: 'breakfast', image: undefined });
+      setPer100g(null);
       setIsAdding(false);
       setIsEditing(false);
       setSearchTerm('');
@@ -297,6 +313,7 @@ const NutritionPage: React.FC = () => {
 
   const startEdit = (item: FoodItem) => {
       setFormData({ ...item });
+      setPer100g(calculatePer100g(item));
       setIsEditing(true);
       setIsAdding(true);
   };
@@ -359,15 +376,17 @@ const NutritionPage: React.FC = () => {
               try {
                   const result = await analyzeFoodText(transcript);
                   if (result) {
-                      setFormData(prev => ({
-                          ...prev,
-                          name: result.foodName || transcript, // Fallback to transcript if API fails
+                      const itemData = {
+                          ...formData,
+                          name: result.foodName || transcript,
                           calories: result.calories || 0,
                           protein: result.protein || 0,
                           fat: result.fat || 0,
                           carbs: result.carbs || 0,
                           grams: result.estimatedWeightGrams || 100
-                      }));
+                      };
+                      setFormData(itemData);
+                      setPer100g(calculatePer100g(itemData));
                   }
               } catch (e) {
                   console.error(e);
@@ -392,8 +411,8 @@ const NutritionPage: React.FC = () => {
         const result = await analyzeFoodImage(base64Data);
         
         if (result) {
-          setFormData(prev => ({
-            ...prev,
+          const itemData = {
+            ...formData,
             name: result.foodName || 'Неизвестное блюдо',
             calories: result.calories || 0,
             protein: result.protein || 0,
@@ -401,7 +420,9 @@ const NutritionPage: React.FC = () => {
             carbs: result.carbs || 0,
             grams: result.estimatedWeightGrams || 100,
             image: base64String // Save the original image as data URL for thumbnail
-          }));
+          };
+          setFormData(itemData);
+          setPer100g(calculatePer100g(itemData));
         }
         setIsAnalyzing(false);
       };
@@ -410,6 +431,25 @@ const NutritionPage: React.FC = () => {
       console.error(e);
       setIsAnalyzing(false);
     }
+  };
+
+  // Helper to update field and maintain per100g logic
+  const handleManualMetricChange = (field: keyof FoodItem, value: number) => {
+      // Update form data immediately
+      const newFormData = { ...formData, [field]: value };
+      setFormData(newFormData);
+
+      // Recalculate per100g based on current grams
+      // This ensures if user types macros manually, the ratio is updated
+      if (formData.grams && formData.grams > 0) {
+          const factor = 100 / formData.grams;
+          setPer100g(prev => ({
+              calories: field === 'calories' ? value * factor : (prev?.calories || 0),
+              protein: field === 'protein' ? value * factor : (prev?.protein || 0),
+              fat: field === 'fat' ? value * factor : (prev?.fat || 0),
+              carbs: field === 'carbs' ? value * factor : (prev?.carbs || 0),
+          }));
+      }
   };
 
   const log = foodLogs[selectedDate];
@@ -632,6 +672,7 @@ const NutritionPage: React.FC = () => {
                                           setSearchTerm(value);
                                           if (value !== formData.name) {
                                              setFormData({ ...formData, name: value, calories: 0, protein: 0, fat: 0, carbs: 0, grams: 100 });
+                                             setPer100g(null);
                                           }
                                         }
                                     }}
@@ -678,7 +719,7 @@ const NutritionPage: React.FC = () => {
                                     type="number"
                                     value={formData.calories || ''}
                                     onFocus={(e) => e.target.select()}
-                                    onChange={(e) => setFormData({ ...formData, calories: parseFloat(e.target.value) || 0 })}
+                                    onChange={(e) => handleManualMetricChange('calories', parseFloat(e.target.value) || 0)}
                                     className="w-full bg-slate-800 p-3 rounded-xl outline-none border border-slate-700 focus:border-emerald-500 mt-1"
                                 />
                             </div>
@@ -691,18 +732,20 @@ const NutritionPage: React.FC = () => {
                                     onChange={(e) => {
                                         const newGrams = parseFloat(e.target.value) || 0;
                                         setFormData(prev => {
-                                            const oldGrams = prev.grams || 100;
-                                            if (oldGrams <= 0) return { ...prev, grams: newGrams };
-                                            
-                                            const ratio = newGrams / oldGrams;
-                                            return {
-                                                ...prev,
-                                                grams: newGrams,
-                                                calories: Math.round((prev.calories || 0) * ratio),
-                                                protein: parseFloat(((prev.protein || 0) * ratio).toFixed(1)),
-                                                fat: parseFloat(((prev.fat || 0) * ratio).toFixed(1)),
-                                                carbs: parseFloat(((prev.carbs || 0) * ratio).toFixed(1)),
-                                            };
+                                            // Recalculate based on base density (per100g) if available
+                                            if (per100g) {
+                                                const ratio = newGrams / 100;
+                                                return {
+                                                    ...prev,
+                                                    grams: newGrams,
+                                                    calories: Math.round(per100g.calories * ratio),
+                                                    protein: parseFloat((per100g.protein * ratio).toFixed(1)),
+                                                    fat: parseFloat((per100g.fat * ratio).toFixed(1)),
+                                                    carbs: parseFloat((per100g.carbs * ratio).toFixed(1)),
+                                                };
+                                            }
+                                            // Fallback: Just update grams if no base density
+                                            return { ...prev, grams: newGrams };
                                         });
                                     }}
                                     className="w-full bg-slate-800 p-3 rounded-xl outline-none border border-slate-700 focus:border-emerald-500 mt-1"
@@ -717,7 +760,7 @@ const NutritionPage: React.FC = () => {
                                     type="number"
                                     value={formData.protein || ''}
                                     onFocus={(e) => e.target.select()}
-                                    onChange={(e) => setFormData({ ...formData, protein: parseFloat(e.target.value) || 0 })}
+                                    onChange={(e) => handleManualMetricChange('protein', parseFloat(e.target.value) || 0)}
                                     className="w-full bg-slate-800 p-2 rounded-xl outline-none border border-slate-700 focus:border-emerald-500 mt-1 text-center"
                                 />
                             </div>
@@ -727,7 +770,7 @@ const NutritionPage: React.FC = () => {
                                     type="number"
                                     value={formData.fat || ''}
                                     onFocus={(e) => e.target.select()}
-                                    onChange={(e) => setFormData({ ...formData, fat: parseFloat(e.target.value) || 0 })}
+                                    onChange={(e) => handleManualMetricChange('fat', parseFloat(e.target.value) || 0)}
                                     className="w-full bg-slate-800 p-2 rounded-xl outline-none border border-slate-700 focus:border-emerald-500 mt-1 text-center"
                                 />
                             </div>
@@ -737,7 +780,7 @@ const NutritionPage: React.FC = () => {
                                     type="number"
                                     value={formData.carbs || ''}
                                     onFocus={(e) => e.target.select()}
-                                    onChange={(e) => setFormData({ ...formData, carbs: parseFloat(e.target.value) || 0 })}
+                                    onChange={(e) => handleManualMetricChange('carbs', parseFloat(e.target.value) || 0)}
                                     className="w-full bg-slate-800 p-2 rounded-xl outline-none border border-slate-700 focus:border-emerald-500 mt-1 text-center"
                                 />
                             </div>
