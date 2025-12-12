@@ -1,18 +1,9 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Helper to get the client dynamically so it picks up localStorage changes
-const getAiClient = () => {
-  const apiKey = localStorage.getItem('gemini_api_key') || process.env.API_KEY;
-  if (!apiKey) {
-    console.warn("No API Key found. AI features will not work.");
-    // Return a dummy object or throw to handle gracefully in UI, 
-    // but the SDK might throw if initialized with empty key.
-    // We'll initialize with empty string and let calls fail if no key.
-    return new GoogleGenAI({ apiKey: '' });
-  }
-  return new GoogleGenAI({ apiKey });
-};
+// Strictly follow the guidelines: Use process.env.API_KEY directly.
+// The vite.config.ts file handles the mapping of this variable during the build.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export interface AnalyzedFood {
   foodName: string;
@@ -38,7 +29,6 @@ const foodAnalysisSchema = {
 
 export const analyzeFoodImage = async (base64Image: string): Promise<AnalyzedFood | null> => {
   try {
-    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: {
@@ -72,7 +62,6 @@ export const analyzeFoodImage = async (base64Image: string): Promise<AnalyzedFoo
 
 export const analyzeFoodText = async (text: string): Promise<AnalyzedFood | null> => {
   try {
-    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: {
@@ -105,7 +94,6 @@ export const analyzeFoodText = async (text: string): Promise<AnalyzedFood | null
 
 export const generateFoodThumbnail = async (foodName: string): Promise<string | null> => {
   try {
-    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image', 
       contents: {

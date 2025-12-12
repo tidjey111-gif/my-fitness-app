@@ -25,7 +25,6 @@ interface AppContextType extends AppState {
   updateFoodLog: (date: string, log: FoodLog) => void;
   importData: (data: AppState) => void;
   getAllData: () => AppState;
-  updateApiKey: (key: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -103,15 +102,44 @@ const INITIAL_STATE: AppState = {
   selectedDate: getLocalToday(),
 };
 
+const STORAGE_KEY = 'fitflow_app_data';
+
 const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<AppState>(INITIAL_STATE);
+  // Initialize state from LocalStorage or use default
+  const [state, setState] = useState<AppState>(() => {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error("Failed to load state from storage:", error);
+    }
+    return INITIAL_STATE;
+  });
+
   const [currentTab, setCurrentTab] = useState<Tab>(Tab.HOME);
 
   const prDays = useMemo(() => calculatePRDays(state.workoutLogs), [state.workoutLogs]);
 
+  // Save to LocalStorage whenever state changes
+  useEffect(() => {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+        console.error("Failed to save state to storage:", error);
+    }
+  }, [state]);
+
+  // Ensure selectedDate is set to today on app load (optional UX choice: start on today)
   useEffect(() => {
     const today = getLocalToday();
-    setState(prev => ({ ...prev, selectedDate: today }));
+    setState(prev => {
+        if (prev.selectedDate !== today) {
+            return { ...prev, selectedDate: today };
+        }
+        return prev;
+    });
   }, []);
 
   const setDate = (date: string) => {
@@ -226,12 +254,6 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       return state;
   };
 
-  const updateApiKey = (key: string) => {
-      localStorage.setItem('gemini_api_key', key);
-      // Simple reload to ensure services pick up the new key from storage
-      window.location.reload();
-  };
-
   return (
     <AppContext.Provider value={{
       ...state,
@@ -250,8 +272,7 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       updateUserProfile,
       updateUserGoals,
       importData,
-      getAllData,
-      updateApiKey
+      getAllData
     }}>
       {children}
     </AppContext.Provider>
