@@ -1,7 +1,8 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../App';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, Tooltip } from 'recharts';
-import { Activity, Flame, Trophy, Plus, ChevronRight, Settings, Target, Award, X, Download, Upload, Flag } from 'lucide-react';
+import { Activity, Flame, Trophy, Plus, ChevronRight, Settings, Target, Award, X, Download, Upload, Flag, RotateCcw } from 'lucide-react';
 import { Tab, UserProfile, MacroGoal, AppState } from '../types';
 
 // --- Sub-components ---
@@ -193,7 +194,8 @@ const SettingsModal: React.FC<{
 const WeightGoalProgress: React.FC<{
     progressData: { progress: number; isComplete: boolean; startWeight: number };
     daysRemainingData: { days: number; noun: string; };
-}> = ({ progressData, daysRemainingData }) => {
+    onReset: () => void;
+}> = ({ progressData, daysRemainingData, onReset }) => {
     const { userProfile } = useApp();
     
     // Determine if we are losing or gaining weight
@@ -266,7 +268,18 @@ const WeightGoalProgress: React.FC<{
                 </div>
                 <div className="text-xs text-slate-300">
                     {progressData.isComplete 
-                        ? <span className="text-emerald-400 font-bold">Цель достигнута!</span>
+                        ? (
+                            <div className="flex items-center gap-3">
+                                <span className="text-emerald-400 font-bold hidden sm:inline">Цель достигнута!</span>
+                                <button 
+                                    onClick={onReset}
+                                    className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 transition-all flex items-center gap-1.5 animate-pulse"
+                                >
+                                    <RotateCcw size={12} />
+                                    Новая цель
+                                </button>
+                            </div>
+                        )
                         : <span>Осталось: <span className="text-white font-bold">{daysRemainingData.days}</span> {daysRemainingData.noun}</span>
                     }
                 </div>
@@ -569,7 +582,11 @@ const HomePage: React.FC = () => {
       </div>
       
       {/* Weight Goal Progress - Modern Style applied in component */}
-      <WeightGoalProgress progressData={progressData} daysRemainingData={daysRemainingData} />
+      <WeightGoalProgress 
+        progressData={progressData} 
+        daysRemainingData={daysRemainingData} 
+        onReset={() => setIsSettingsOpen(true)}
+      />
 
       {/* Today's Workout - Modern & Detailed Style with Gym Background */}
       <div 
