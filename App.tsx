@@ -51,11 +51,9 @@ const calculatePRDays = (logs: Record<string, WorkoutLog>): Set<string> => {
 
             for (const set of ex.sets) {
                 let isPR = false;
-                // Check Weight PR
                 if (set.weight > stats[name].maxWeight) {
                     isPR = true;
                 }
-                // Check Rep PR only if weight history exists.
                 else if (stats[name].repsByWeight[set.weight] !== undefined) {
                     if (set.reps > stats[name].repsByWeight[set.weight]) {
                         isPR = true;
@@ -66,7 +64,6 @@ const calculatePRDays = (logs: Record<string, WorkoutLog>): Set<string> => {
                     dayHasPR = true;
                 }
 
-                // Update Stats after checking
                 if (set.weight > stats[name].maxWeight) {
                     stats[name].maxWeight = set.weight;
                 }
@@ -81,14 +78,12 @@ const calculatePRDays = (logs: Record<string, WorkoutLog>): Set<string> => {
     return prDays;
 };
 
-// --- Helper: Get Local Date ISO String ---
 const getLocalToday = () => {
   const d = new Date();
   const offset = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - offset).toISOString().split('T')[0];
 };
 
-// --- Initial State ---
 const INITIAL_STATE: AppState = {
   userProfile: {
     name: 'Атлет',
@@ -105,12 +100,13 @@ const INITIAL_STATE: AppState = {
 const STORAGE_KEY = 'fitflow_app_data';
 
 const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Initialize state from LocalStorage or use default
   const [state, setState] = useState<AppState>(() => {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
-            return JSON.parse(saved);
+            const parsed = JSON.parse(saved);
+            // Re-ensure today's date if needed but keep logs
+            return { ...parsed, selectedDate: parsed.selectedDate || getLocalToday() };
         }
     } catch (error) {
         console.error("Failed to load state from storage:", error);
@@ -122,25 +118,17 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   const prDays = useMemo(() => calculatePRDays(state.workoutLogs), [state.workoutLogs]);
 
-  // Save to LocalStorage whenever state changes
+  // Sync to LocalStorage on every state change
   useEffect(() => {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
-        console.error("Failed to save state to storage:", error);
+        console.error("Failed to save state to storage (likely quota exceeded):", error);
+        if (error instanceof Error && error.name === 'QuotaExceededError') {
+            alert('Память заполнена! Попробуйте удалить старые записи с фото.');
+        }
     }
   }, [state]);
-
-  // Ensure selectedDate is set to today on app load (optional UX choice: start on today)
-  useEffect(() => {
-    const today = getLocalToday();
-    setState(prev => {
-        if (prev.selectedDate !== today) {
-            return { ...prev, selectedDate: today };
-        }
-        return prev;
-    });
-  }, []);
 
   const setDate = (date: string) => {
     setState(prev => ({ ...prev, selectedDate: date }));
@@ -156,7 +144,7 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const addFoodItem = (date: string, item: FoodItem) => {
     setState(prev => {
       const log = prev.foodLogs[date] || { id: Math.random().toString(), date, items: [] };
-      const newItems = [...log.items, { ...item, id: Math.random().toString() }];
+      const newItems = [...log.items, item];
       return {
         ...prev,
         foodLogs: { ...prev.foodLogs, [date]: { ...log, items: newItems } }
@@ -279,13 +267,11 @@ const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   );
 };
 
-// --- Main Layout ---
 const Layout: React.FC = () => {
   const { currentTab, setTab } = useApp();
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-50 font-sans overflow-hidden">
-      {/* Content Area */}
       <main className="flex-1 overflow-y-auto pb-24 scroll-smooth">
         {currentTab === Tab.HOME && <HomePage />}
         {currentTab === Tab.WORKOUT && <WorkoutPage />}
@@ -293,7 +279,6 @@ const Layout: React.FC = () => {
         {currentTab === Tab.STATISTICS && <StatisticsPage />}
       </main>
 
-      {/* Navigation Bar */}
       <nav className="fixed bottom-0 w-full bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 pb-safe safe-area-inset-bottom z-50">
         <div className="flex justify-around items-center h-16 max-w-md mx-auto">
           <NavButton tab={Tab.HOME} current={currentTab} setTab={setTab} icon={<Home size={24} />} label="Главная" />

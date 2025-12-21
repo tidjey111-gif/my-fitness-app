@@ -6,6 +6,36 @@ import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 import { FoodItem, FoodLog, MealType } from '../types';
 import { getWeekDays } from '../utils';
 
+// --- Utility: Image Compression ---
+const compressImage = (base64Str: string, maxWidth = 400, maxHeight = 400): Promise<string> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.src = base64Str;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+                if (width > maxWidth) {
+                    height *= maxWidth / width;
+                    width = maxWidth;
+                }
+            } else {
+                if (height > maxHeight) {
+                    width *= maxHeight / height;
+                    height = maxHeight;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress to 70% quality JPEG
+        };
+    });
+};
+
 // --- Sub-components ---
 
 const DayProgressVisual: React.FC<{ date: string }> = ({ date }) => {
@@ -15,18 +45,14 @@ const DayProgressVisual: React.FC<{ date: string }> = ({ date }) => {
     const goal = userGoals.calories;
     const progress = goal > 0 ? (consumed / goal) * 100 : 0;
     
-    // Clamp progress between 0 and 100 for height
     const height = Math.min(100, Math.max(0, progress));
-
     const isExceeded = progress > 100;
     const isCompleted = progress >= 100;
     
-    // Define colors
-    let bgColor = "bg-emerald-500/90"; // Normal
+    let bgColor = "bg-emerald-500/90";
     if (isExceeded) bgColor = "bg-red-600/90";
     else if (isCompleted) bgColor = "bg-emerald-600";
 
-    // Memoize bubbles to prevent jumping on re-renders
     const bubbles = useMemo(() => Array.from({ length: 4 }).map((_, i) => ({
         id: i,
         left: `${Math.random() * 80 + 10}%`,
@@ -42,13 +68,10 @@ const DayProgressVisual: React.FC<{ date: string }> = ({ date }) => {
                 className={`absolute bottom-0 left-0 right-0 transition-all duration-700 ease-in-out ${bgColor}`}
                 style={{ height: `${height}%` }}
             >
-                {/* Sloshing Wave Surface */}
                 <div 
                     className="absolute -top-[5px] left-1/2 w-[160%] h-[10px] bg-white/20 rounded-[50%]"
                     style={{ animation: 'wave-slosh 3s ease-in-out infinite' }}
                 ></div>
-
-                {/* Rising Bubbles */}
                 {bubbles.map((b) => (
                     <div 
                         key={b.id}
@@ -230,27 +253,24 @@ const NutritionPage: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isListening, setIsListening] = useState(false); // State for voice input
+  const [isListening, setIsListening] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMode, setCalendarMode] = useState<'NAVIGATE' | 'COPY_DAY' | 'COPY_MEAL'>('NAVIGATE');
   const [mealTypeToCopy, setMealTypeToCopy] = useState<MealType | null>(null);
-
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const [formData, setFormData] = useState<Partial<FoodItem>>({
       name: '', calories: 0, protein: 0, fat: 0, carbs: 0, grams: 100, mealType: 'breakfast'
   });
 
-  // Keep track of values per 100g to preserve ratios when weight is cleared
   const [per100g, setPer100g] = useState<{calories: number, protein: number, fat: number, carbs: number} | null>(null);
-
   const [suggestions, setSuggestions] = useState<FoodItem[]>([]);
   
   useEffect(() => {
     const allItems = Object.values(foodLogs).flatMap((log: any) => log.items) as FoodItem[];
-    // Keep unique items by name, storing the full item to allow autofill
     const uniqueItemsMap = new Map<string, FoodItem>();
     allItems.forEach(item => {
         if (!item.name) return;
@@ -294,10 +314,12 @@ const NutritionPage: React.FC = () => {
       if (!formData.name) return;
       const mealType = formData.mealType || 'breakfast';
 
+      const finalItem = { ...formData, mealType } as FoodItem;
+
       if (isEditing && formData.id) {
-          editFoodItem(selectedDate, { ...formData as FoodItem, mealType });
+          editFoodItem(selectedDate, finalItem);
       } else {
-          addFoodItem(selectedDate, { ...formData, id: Math.random().toString(), mealType } as FoodItem);
+          addFoodItem(selectedDate, { ...finalItem, id: Math.random().toString() });
       }
       
       resetForm();
@@ -309,6 +331,7 @@ const NutritionPage: React.FC = () => {
       setIsAdding(false);
       setIsEditing(false);
       setSearchTerm('');
+      if (isListening) stopListening();
   };
 
   const startEdit = (item: FoodItem) => {
@@ -325,8 +348,19 @@ const NutritionPage: React.FC = () => {
       }
   };
 
+  const stopListening = () => {
+      if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          setIsListening(false);
+      }
+  };
+
   const handleVoiceInput = () => {
-      // Feature detection for Speech Recognition
+      if (isListening) {
+          stopListening();
+          return;
+      }
+
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       
       if (!SpeechRecognition) {
@@ -336,36 +370,25 @@ const NutritionPage: React.FC = () => {
 
       const recognition = new SpeechRecognition();
       recognition.lang = 'ru-RU';
+      recognition.continuous = false;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
-
-      // Start listening
-      try {
-        recognition.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error("Error starting recognition:", err);
-        setIsListening(false);
-      }
+      recognitionRef.current = recognition;
 
       recognition.onstart = () => {
-          console.log("Voice recognition started...");
+          setIsListening(true);
       };
 
       recognition.onend = () => {
           setIsListening(false);
-          console.log("Voice recognition ended.");
       };
 
       recognition.onerror = (event: any) => {
           setIsListening(false);
-          console.error("Voice recognition error", event.error);
           if (event.error === 'not-allowed') {
-              alert("Доступ к микрофону заблокирован. Пожалуйста, разрешите доступ в настройках браузера (значок замка или камеры в адресной строке) и перезагрузите страницу.");
-          } else if (event.error === 'no-speech') {
-              // Just ignore no speech, don't alert
-          } else {
-              alert(`Ошибка распознавания: ${event.error}`);
+              alert("Доступ к микрофону заблокирован. Пожалуйста, разрешите доступ в настройках браузера.");
+          } else if (event.error !== 'no-speech') {
+              console.error("Speech recognition error:", event.error);
           }
       };
 
@@ -396,6 +419,13 @@ const NutritionPage: React.FC = () => {
               }
           }
       };
+
+      try {
+          recognition.start();
+      } catch (err) {
+          console.error("Recognition start error:", err);
+          setIsListening(false);
+      }
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -406,8 +436,12 @@ const NutritionPage: React.FC = () => {
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        const base64Data = base64String.split(',')[1];
+        const rawBase64String = reader.result as string;
+        
+        // COMPRESS BEFORE SENDING AND SAVING
+        const compressedBase64 = await compressImage(rawBase64String);
+        const base64Data = compressedBase64.split(',')[1];
+        
         const result = await analyzeFoodImage(base64Data);
         
         if (result) {
@@ -419,7 +453,7 @@ const NutritionPage: React.FC = () => {
             fat: result.fat || 0,
             carbs: result.carbs || 0,
             grams: result.estimatedWeightGrams || 100,
-            image: base64String // Save the original image as data URL for thumbnail
+            image: compressedBase64
           };
           setFormData(itemData);
           setPer100g(calculatePer100g(itemData));
@@ -433,14 +467,9 @@ const NutritionPage: React.FC = () => {
     }
   };
 
-  // Helper to update field and maintain per100g logic
   const handleManualMetricChange = (field: keyof FoodItem, value: number) => {
-      // Update form data immediately
       const newFormData = { ...formData, [field]: value };
       setFormData(newFormData);
-
-      // Recalculate per100g based on current grams
-      // This ensures if user types macros manually, the ratio is updated
       if (formData.grams && formData.grams > 0) {
           const factor = 100 / formData.grams;
           setPer100g(prev => ({
@@ -484,7 +513,6 @@ const NutritionPage: React.FC = () => {
        ></div>
 
        <div className="p-4 pb-24 relative z-10">
-           {/* Date Header with Kitchen Background */}
            <div 
             className="flex items-center justify-between bg-slate-900/80 p-4 rounded-2xl mb-4 sticky top-0 z-20 backdrop-blur-md border border-white/10 shadow-xl bg-cover bg-center overflow-hidden"
             style={{ 
@@ -582,7 +610,6 @@ const NutritionPage: React.FC = () => {
             <Plus size={28} />
           </button>
 
-          {/* Add/Edit Modal */}
           {isAdding && (
               <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
                 <div className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slideUp sm:animate-scaleIn h-[90vh] sm:h-auto overflow-y-auto">
@@ -613,18 +640,17 @@ const NutritionPage: React.FC = () => {
 
                             <button 
                                 onClick={handleVoiceInput}
-                                className="bg-gradient-to-r from-orange-500 to-red-500 p-0.5 rounded-xl cursor-pointer hover:opacity-90 transition-opacity relative overflow-hidden"
+                                className={`p-0.5 rounded-xl cursor-pointer hover:opacity-90 transition-all duration-300 relative overflow-hidden ${isListening ? 'bg-red-500 scale-105' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}
                             >
-                                <div className="bg-slate-900 rounded-[10px] h-full p-4 flex flex-col items-center justify-center gap-2">
-                                    {isListening ? (
-                                        <div className="relative">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                            <Mic className="text-red-500 relative z-10" size={24} />
-                                        </div>
-                                    ) : (
-                                        <Mic className="text-white" size={24} />
+                                <div className="bg-slate-900 rounded-[10px] h-full p-4 flex flex-col items-center justify-center gap-2 relative">
+                                    {isListening && (
+                                        <>
+                                            <div className="voice-pulse-ring"></div>
+                                            <div className="voice-pulse-ring"></div>
+                                        </>
                                     )}
-                                    <span className="font-bold text-white text-sm text-center">
+                                    <Mic className={isListening ? "text-red-500 animate-pulse z-10" : "text-white z-10"} size={24} />
+                                    <span className="font-bold text-white text-sm text-center z-10">
                                         {isListening ? "Слушаю..." : "Голосовой ввод (AI)"}
                                     </span>
                                 </div>
@@ -642,7 +668,6 @@ const NutritionPage: React.FC = () => {
                         </>
                     )}
 
-                    {/* Image Preview */}
                     {formData.image && (
                         <div className="mb-4 flex justify-center relative">
                             <img src={formData.image} alt="Preview" className="h-40 rounded-xl object-cover border border-slate-700 w-full" />
@@ -732,7 +757,6 @@ const NutritionPage: React.FC = () => {
                                     onChange={(e) => {
                                         const newGrams = parseFloat(e.target.value) || 0;
                                         setFormData(prev => {
-                                            // Recalculate based on base density (per100g) if available
                                             if (per100g) {
                                                 const ratio = newGrams / 100;
                                                 return {
@@ -744,7 +768,6 @@ const NutritionPage: React.FC = () => {
                                                     carbs: parseFloat((per100g.carbs * ratio).toFixed(1)),
                                                 };
                                             }
-                                            // Fallback: Just update grams if no base density
                                             return { ...prev, grams: newGrams };
                                         });
                                     }}
@@ -797,7 +820,6 @@ const NutritionPage: React.FC = () => {
               </div>
           )}
 
-          {/* Delete Confirmation Modal */}
           {deleteConfirmation && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-scaleIn">
@@ -811,7 +833,6 @@ const NutritionPage: React.FC = () => {
               </div>
           )}
           
-          {/* Calendar Modal */}
           {isCalendarOpen && (
             <CalendarModal 
                 onClose={() => setIsCalendarOpen(false)} 
