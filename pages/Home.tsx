@@ -500,8 +500,8 @@ const HomePage: React.FC = () => {
             </div>
         </div>
 
-        <div className="flex flex-row items-center justify-between relative z-10">
-            <div className="w-36 h-36 relative shrink-0">
+        <div className="flex flex-col sm:flex-row items-center justify-between relative z-10">
+            <div className="w-32 h-32 sm:w-36 sm:h-36 relative shrink-0 mb-6 sm:mb-0">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
@@ -526,7 +526,7 @@ const HomePage: React.FC = () => {
                 </div>
             </div>
             
-            <div className="flex-1 ml-8 space-y-4">
+            <div className="flex-1 w-full sm:ml-8 space-y-4">
                 <MacroProgress label="Белки" current={consumed.protein} total={userGoals.protein} color="bg-emerald-400" />
                 <MacroProgress label="Углеводы" current={consumed.carbs} total={userGoals.carbs} color="bg-blue-400" />
                 <MacroProgress label="Жиры" current={consumed.fat} total={userGoals.fat} color="bg-yellow-400" />
@@ -731,8 +731,8 @@ const MacroProgress: React.FC<{ label: string; current: number; total: number; c
             <div className="flex justify-between items-end text-xs mb-1.5 font-medium">
                 <span className="text-slate-400">{label}</span>
                 <div className="flex items-center gap-1.5">
-                    <span className="text-white text-sm">{Math.round(current)} <span className="text-slate-500 text-xs">/ {total}г</span></span>
-                    <span className={`text-[10px] ${percentage >= 100 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    <span className="text-white text-sm whitespace-nowrap">{Math.round(current)} <span className="text-slate-500 text-xs">/ {total}г</span></span>
+                    <span className={`text-[10px] min-w-[24px] text-right ${percentage >= 100 ? 'text-emerald-400' : 'text-slate-400'}`}>
                         {percentage}%
                     </span>
                 </div>
