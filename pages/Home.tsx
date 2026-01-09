@@ -724,16 +724,27 @@ const HomePage: React.FC = () => {
   );
 };
 
-const MacroProgress: React.FC<{ label: string; current: number; total: number; color: string }> = ({ label, current, total, color }) => (
-    <div>
-        <div className="flex justify-between text-xs mb-1.5 font-medium">
-            <span className="text-slate-400">{label}</span>
-            <span className="text-slate-300">{total > 0 ? Math.round((current / total) * 100) : 0}%</span>
+const MacroProgress: React.FC<{ label: string; current: number; total: number; color: string }> = ({ label, current, total, color }) => {
+    const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+    return (
+        <div>
+            <div className="flex justify-between items-end text-xs mb-1.5 font-medium">
+                <span className="text-slate-400">{label}</span>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-white text-sm">{Math.round(current)} <span className="text-slate-500 text-xs">/ {total}г</span></span>
+                    <span className={`text-[10px] ${percentage >= 100 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                        {percentage}%
+                    </span>
+                </div>
+            </div>
+            <div className="h-2.5 w-full bg-slate-950/50 rounded-full overflow-hidden border border-white/5">
+                <div 
+                    className={`h-full ${color} rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)] transition-all duration-500`} 
+                    style={{ width: `${Math.min(100, percentage)}%` }}
+                ></div>
+            </div>
         </div>
-        <div className="h-2.5 w-full bg-slate-950/50 rounded-full overflow-hidden border border-white/5">
-            <div className={`h-full ${color} rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)]`} style={{ width: `${total > 0 ? Math.min(100, (current / total) * 100) : 0}%` }}></div>
-        </div>
-    </div>
-);
+    );
+};
 
 export default HomePage;
