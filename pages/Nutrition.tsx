@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../App';
-import { Camera, Search, Plus, X, Loader2, Save, Calendar, ChevronLeft, ChevronRight, Copy, Edit2, Trash2, Check, Utensils, Mic } from 'lucide-react';
+import { Camera, Search, Plus, X, Loader2, Save, Calendar, ChevronLeft, ChevronRight, Copy, Edit2, Trash2, Check, Utensils, Sparkles } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 import { FoodItem, FoodLog, MealType } from '../types';
 import { getWeekDays } from '../utils';
@@ -253,14 +253,16 @@ const NutritionPage: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMode, setCalendarMode] = useState<'NAVIGATE' | 'COPY_DAY' | 'COPY_MEAL'>('NAVIGATE');
   const [mealTypeToCopy, setMealTypeToCopy] = useState<MealType | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
   
+  // AI Text Input State
+  const [showAiInput, setShowAiInput] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
 
   const [formData, setFormData] = useState<Partial<FoodItem>>({
       name: '', calories: 0, protein: 0, fat: 0, carbs: 0, grams: 100, mealType: 'breakfast'
@@ -331,7 +333,8 @@ const NutritionPage: React.FC = () => {
       setIsAdding(false);
       setIsEditing(false);
       setSearchTerm('');
-      if (isListening) stopListening();
+      setShowAiInput(false);
+      setAiQuery('');
   };
 
   const startEdit = (item: FoodItem) => {
@@ -348,83 +351,31 @@ const NutritionPage: React.FC = () => {
       }
   };
 
-  const stopListening = () => {
-      if (recognitionRef.current) {
-          recognitionRef.current.stop();
-          setIsListening(false);
-      }
-  };
-
-  const handleVoiceInput = () => {
-      if (isListening) {
-          stopListening();
-          return;
-      }
-
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
-      if (!SpeechRecognition) {
-          alert('Ваш браузер не поддерживает голосовой ввод. Попробуйте использовать Google Chrome.');
-          return;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'ru-RU';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      recognitionRef.current = recognition;
-
-      recognition.onstart = () => {
-          setIsListening(true);
-      };
-
-      recognition.onend = () => {
-          setIsListening(false);
-      };
-
-      recognition.onerror = (event: any) => {
-          setIsListening(false);
-          if (event.error === 'not-allowed') {
-              alert("Доступ к микрофону заблокирован. Пожалуйста, разрешите доступ в настройках браузера.");
-          } else if (event.error !== 'no-speech') {
-              console.error("Speech recognition error:", event.error);
-          }
-      };
-
-      recognition.onresult = async (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          if (transcript) {
-              setIsAnalyzing(true);
-              try {
-                  const result = await analyzeFoodText(transcript);
-                  if (result) {
-                      const itemData = {
-                          ...formData,
-                          name: result.foodName || transcript,
-                          calories: result.calories || 0,
-                          protein: result.protein || 0,
-                          fat: result.fat || 0,
-                          carbs: result.carbs || 0,
-                          grams: result.estimatedWeightGrams || 100
-                      };
-                      setFormData(itemData);
-                      setPer100g(calculatePer100g(itemData));
-                  }
-              } catch (e) {
-                  console.error(e);
-                  alert('Не удалось обработать запрос. Попробуйте еще раз.');
-              } finally {
-                  setIsAnalyzing(false);
-              }
-          }
-      };
-
+  const handleAiTextAnalyze = async () => {
+      if (!aiQuery.trim()) return;
+      setIsAnalyzing(true);
       try {
-          recognition.start();
-      } catch (err) {
-          console.error("Recognition start error:", err);
-          setIsListening(false);
+          const result = await analyzeFoodText(aiQuery);
+          if (result) {
+              const itemData = {
+                  ...formData,
+                  name: result.foodName || aiQuery,
+                  calories: result.calories || 0,
+                  protein: result.protein || 0,
+                  fat: result.fat || 0,
+                  carbs: result.carbs || 0,
+                  grams: result.estimatedWeightGrams || 100
+              };
+              setFormData(itemData);
+              setPer100g(calculatePer100g(itemData));
+              setShowAiInput(false); // Close the input after success
+              setAiQuery('');
+          }
+      } catch (e) {
+          console.error(e);
+          alert('Не удалось обработать запрос. Попробуйте еще раз.');
+      } finally {
+          setIsAnalyzing(false);
       }
   };
 
@@ -638,24 +589,35 @@ const NutritionPage: React.FC = () => {
                                 />
                             </div>
 
-                            <button 
-                                onClick={handleVoiceInput}
-                                className={`p-0.5 rounded-xl cursor-pointer hover:opacity-90 transition-all duration-300 relative overflow-hidden ${isListening ? 'bg-red-500 scale-105' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}
+                            <div 
+                                onClick={() => setShowAiInput(!showAiInput)}
+                                className={`p-0.5 rounded-xl cursor-pointer hover:opacity-90 transition-all duration-300 relative overflow-hidden ${showAiInput ? 'bg-emerald-500 scale-105' : 'bg-gradient-to-r from-orange-500 to-amber-500'}`}
                             >
-                                <div className="bg-slate-900 rounded-[10px] h-full p-4 flex flex-col items-center justify-center gap-2 relative">
-                                    {isListening && (
-                                        <>
-                                            <div className="voice-pulse-ring"></div>
-                                            <div className="voice-pulse-ring"></div>
-                                        </>
-                                    )}
-                                    <Mic className={isListening ? "text-red-500 animate-pulse z-10" : "text-white z-10"} size={24} />
-                                    <span className="font-bold text-white text-sm text-center z-10">
-                                        {isListening ? "Слушаю..." : "Голосовой ввод (AI)"}
-                                    </span>
+                                <div className="bg-slate-900 rounded-[10px] h-full p-4 flex flex-col items-center justify-center gap-2">
+                                     <Sparkles className={showAiInput ? "text-emerald-400" : "text-white"} size={24} />
+                                     <span className="font-bold text-white text-sm text-center">Описать (AI)</span>
                                 </div>
-                            </button>
+                            </div>
                         </div>
+
+                        {showAiInput && (
+                            <div className="mb-6 animate-fadeIn">
+                                <textarea
+                                    value={aiQuery}
+                                    onChange={(e) => setAiQuery(e.target.value)}
+                                    placeholder="Опишите еду, например: 'Большая тарелка борща со сметаной' или 'Куриная грудка 150г'"
+                                    className="w-full bg-slate-800 p-3 rounded-xl outline-none border border-slate-700 focus:border-emerald-500 min-h-[80px] text-white"
+                                />
+                                <button 
+                                    onClick={handleAiTextAnalyze}
+                                    disabled={isAnalyzing || !aiQuery.trim()}
+                                    className="w-full mt-2 py-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded-xl font-bold hover:bg-emerald-500/30 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {isAnalyzing ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
+                                    Рассчитать БЖУ (AI)
+                                </button>
+                            </div>
+                        )}
                         
                         <div className="relative mb-6">
                           <div className="absolute inset-0 flex items-center" aria-hidden="true">
