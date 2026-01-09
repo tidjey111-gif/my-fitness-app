@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../App';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Trophy, MoreHorizontal, X, Save, Calendar, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Trophy, MoreHorizontal, X, Save, Calendar, Copy, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
 import { Exercise, ExerciseSet, WorkoutLog } from '../types';
 import { getWeekDays } from '../utils';
 
@@ -201,6 +202,10 @@ const WorkoutPage: React.FC = () => {
   const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [isCopyMode, setIsCopyMode] = useState(false);
   
+  // State for collapsible cards and editing
+  const [expandedExercises, setExpandedExercises] = useState<Record<string, boolean>>({});
+  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
+
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
@@ -257,8 +262,9 @@ const WorkoutPage: React.FC = () => {
 
   const addExercise = () => {
       if (!newExerciseName) return;
+      const newId = Math.random().toString();
       const newEx: Exercise = {
-          id: Math.random().toString(),
+          id: newId,
           name: newExerciseName,
           sets: [{ id: Math.random().toString(), weight: 0, reps: 0, isPR: false }]
       };
@@ -266,8 +272,22 @@ const WorkoutPage: React.FC = () => {
           ...currentLog,
           exercises: [...currentLog.exercises, newEx]
       });
+      // Auto expand the new exercise
+      setExpandedExercises(prev => ({ ...prev, [newId]: true }));
       setNewExerciseName('');
       setModalOpen(false);
+  };
+
+  const updateExerciseName = (exerciseId: string, name: string) => {
+      const updatedExercises = currentLog.exercises.map(ex => 
+          ex.id === exerciseId ? { ...ex, name } : ex
+      );
+      updateWorkout(selectedDate, { ...currentLog, exercises: updatedExercises });
+  };
+
+  const deleteExercise = (exerciseId: string) => {
+      const updatedExercises = currentLog.exercises.filter(ex => ex.id !== exerciseId);
+      updateWorkout(selectedDate, { ...currentLog, exercises: updatedExercises });
   };
 
   const updateSet = (exerciseId: string, setId: string, field: keyof ExerciseSet, value: any) => {
@@ -345,6 +365,10 @@ const WorkoutPage: React.FC = () => {
     updateWorkout(selectedDate, { ...currentLog, exercises: exercisesCopy });
   };
 
+  const toggleExpand = (id: string) => {
+      setExpandedExercises(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
     <div className="relative min-h-screen">
        <div 
@@ -401,90 +425,151 @@ const WorkoutPage: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-              {currentLog.exercises.map((exercise, index) => (
-                  <div 
-                    key={exercise.id} 
-                    className="bg-slate-900/50 border border-white/5 rounded-3xl p-6 animate-fadeIn cursor-grab shadow-xl relative overflow-hidden bg-cover bg-center"
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragEnter={(e) => handleDragEnter(e, index)}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={(e) => e.preventDefault()}
-                    style={{ 
-                        backgroundImage: 'linear-gradient(to bottom right, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.92) 100%), url("https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=2070&auto=format&fit=crop")' 
-                    }}
-                  >
-                      <div className="relative z-10">
-                          <div className="flex justify-between items-center mb-4">
-                              <h3 className="font-semibold text-lg">{exercise.name}</h3>
-                              <button onClick={() => deleteSet(exercise.id, "all")} className="text-slate-500 hover:text-white transition-colors"><MoreHorizontal size={20}/></button>
-                          </div>
-                          
-                          <textarea
-                            value={exercise.notes || ''}
-                            onChange={(e) => updateExerciseNotes(exercise.id, e.target.value)}
-                            placeholder="Добавить заметку (например, техника, темп...)"
-                            className="w-full bg-slate-950/50 rounded-lg p-3 text-sm text-orange-400 italic placeholder-slate-600 outline-none focus:ring-1 focus:ring-orange-500 mb-4 resize-none transition-colors border border-white/5"
-                            rows={2}
-                          />
-                          
-                          <div className="grid grid-cols-10 gap-2 mb-2 text-xs text-slate-500 uppercase font-bold text-center">
-                              <div className="col-span-2">Подход</div>
-                              <div className="col-span-3">кг</div>
-                              <div className="col-span-3">Повт.</div>
-                              <div className="col-span-2">Готово</div>
-                          </div>
+              {currentLog.exercises.map((exercise, index) => {
+                  const isExpanded = expandedExercises[exercise.id] ?? true;
+                  const isEditing = editingExerciseId === exercise.id;
 
-                          <div className="space-y-2">
-                              {exercise.sets.map((set, idx) => {
-                                  const isRecord = checkIfPR(exercise.name, set.weight, set.reps);
-                                  return (
-                                    <div key={set.id} className="grid grid-cols-10 gap-2 items-center">
-                                        <div className="col-span-2 flex justify-center items-center">
-                                            <div className="bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-300">
-                                                {idx + 1}
+                  return (
+                    <div 
+                        key={exercise.id} 
+                        className="bg-slate-900/50 border border-white/5 rounded-3xl animate-fadeIn cursor-grab shadow-xl relative overflow-hidden bg-cover bg-center transition-all duration-300"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => e.preventDefault()}
+                        style={{ 
+                            backgroundImage: 'linear-gradient(to bottom right, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.92) 100%), url("https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=2070&auto=format&fit=crop")' 
+                        }}
+                    >
+                        <div className="relative z-10">
+                            {/* Header Section */}
+                            <div className="flex justify-between items-center p-4 bg-black/20 backdrop-blur-sm">
+                                <div className="flex items-center gap-3 flex-1">
+                                    <button 
+                                        onClick={() => toggleExpand(exercise.id)} 
+                                        className="p-1 rounded-full hover:bg-white/10 text-slate-400"
+                                    >
+                                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    </button>
+                                    
+                                    <div className="flex-1">
+                                        {isEditing ? (
+                                            <input 
+                                                autoFocus
+                                                value={exercise.name}
+                                                onChange={(e) => updateExerciseName(exercise.id, e.target.value)}
+                                                onBlur={() => setEditingExerciseId(null)}
+                                                onKeyDown={(e) => e.key === 'Enter' && setEditingExerciseId(null)}
+                                                className="bg-slate-800 text-white px-2 py-1 rounded-lg w-full outline-none border border-emerald-500 font-semibold text-lg"
+                                            />
+                                        ) : (
+                                            <h3 
+                                                className="font-semibold text-lg cursor-pointer hover:text-emerald-400 transition-colors"
+                                                onClick={() => toggleExpand(exercise.id)}
+                                            >
+                                                {exercise.name}
+                                            </h3>
+                                        )}
+                                        {/* Show summary if collapsed */}
+                                        {!isExpanded && (
+                                            <div className="text-xs text-slate-400 font-mono mt-0.5 truncate">
+                                                {exercise.sets.length > 0 
+                                                    ? exercise.sets.map(s => `${s.weight}кг-${s.reps}`).join(', ')
+                                                    : 'Нет подходов'}
                                             </div>
-                                        </div>
-                                        <div className="col-span-3">
-                                            <input 
-                                                type="number" 
-                                                value={set.weight}
-                                                onFocus={(e) => e.target.select()}
-                                                onChange={(e) => updateSet(exercise.id, set.id, 'weight', parseFloat(e.target.value))}
-                                                className="w-full bg-slate-950/50 rounded-md p-2 text-center text-sm outline-none focus:ring-1 focus:ring-emerald-500 border border-white/5"
-                                            />
-                                        </div>
-                                        <div className="col-span-3 relative">
-                                            <input 
-                                                type="number" 
-                                                value={set.reps}
-                                                onFocus={(e) => e.target.select()}
-                                                onChange={(e) => updateSet(exercise.id, set.id, 'reps', parseFloat(e.target.value))}
-                                                className="w-full bg-slate-950/50 rounded-md p-2 text-center text-sm outline-none focus:ring-1 focus:ring-emerald-500 border border-white/5"
-                                            />
-                                            {isRecord && (
-                                                <Trophy size={14} className="absolute -top-2 -right-2 text-yellow-400 drop-shadow-lg animate-pulse" fill="#facc15" />
-                                            )}
-                                        </div>
-                                        <div className="col-span-2 flex justify-center">
-                                            <button onClick={() => deleteSet(exercise.id, set.id)} className="text-slate-600 hover:text-red-400">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                        )}
                                     </div>
-                                  );
-                              })}
-                          </div>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button 
+                                        onClick={() => setEditingExerciseId(exercise.id)} 
+                                        className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-slate-800 rounded-full transition-colors"
+                                        title="Изменить название"
+                                    >
+                                        <Edit2 size={16}/>
+                                    </button>
+                                    <button 
+                                        onClick={() => deleteExercise(exercise.id)} 
+                                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-full transition-colors"
+                                        title="Удалить упражнение"
+                                    >
+                                        <Trash2 size={16}/>
+                                    </button>
+                                </div>
+                            </div>
 
-                          <button 
-                            onClick={() => addSet(exercise.id)}
-                            className="w-full mt-4 py-2 flex items-center justify-center gap-2 text-sm text-emerald-400 bg-emerald-400/10 rounded-lg hover:bg-emerald-400/20 transition-colors"
-                          >
-                              <Plus size={16} /> Добавить подход
-                          </button>
-                      </div>
-                  </div>
-              ))}
+                            {/* Expanded Content */}
+                            {isExpanded && (
+                                <div className="p-6 pt-2 animate-fadeIn">
+                                    <textarea
+                                        value={exercise.notes || ''}
+                                        onChange={(e) => updateExerciseNotes(exercise.id, e.target.value)}
+                                        placeholder="Добавить заметку (например, техника, темп...)"
+                                        className="w-full bg-slate-950/50 rounded-lg p-3 text-sm text-orange-400 italic placeholder-slate-600 outline-none focus:ring-1 focus:ring-orange-500 mb-4 resize-none transition-colors border border-white/5"
+                                        rows={2}
+                                    />
+                                    
+                                    <div className="grid grid-cols-10 gap-2 mb-2 text-xs text-slate-500 uppercase font-bold text-center">
+                                        <div className="col-span-2">Подход</div>
+                                        <div className="col-span-3">кг</div>
+                                        <div className="col-span-3">Повт.</div>
+                                        <div className="col-span-2">Готово</div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {exercise.sets.map((set, idx) => {
+                                            const isRecord = checkIfPR(exercise.name, set.weight, set.reps);
+                                            return (
+                                                <div key={set.id} className="grid grid-cols-10 gap-2 items-center">
+                                                    <div className="col-span-2 flex justify-center items-center">
+                                                        <div className="bg-slate-800 w-6 h-6 rounded-full flex items-center justify-center text-xs text-slate-300">
+                                                            {idx + 1}
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-span-3">
+                                                        <input 
+                                                            type="number" 
+                                                            value={set.weight}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onChange={(e) => updateSet(exercise.id, set.id, 'weight', parseFloat(e.target.value))}
+                                                            className="w-full bg-slate-950/50 rounded-md p-2 text-center text-sm outline-none focus:ring-1 focus:ring-emerald-500 border border-white/5"
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-3 relative">
+                                                        <input 
+                                                            type="number" 
+                                                            value={set.reps}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onChange={(e) => updateSet(exercise.id, set.id, 'reps', parseFloat(e.target.value))}
+                                                            className="w-full bg-slate-950/50 rounded-md p-2 text-center text-sm outline-none focus:ring-1 focus:ring-emerald-500 border border-white/5"
+                                                        />
+                                                        {isRecord && (
+                                                            <Trophy size={14} className="absolute -top-2 -right-2 text-yellow-400 drop-shadow-lg animate-pulse" fill="#facc15" />
+                                                        )}
+                                                    </div>
+                                                    <div className="col-span-2 flex justify-center">
+                                                        <button onClick={() => deleteSet(exercise.id, set.id)} className="text-slate-600 hover:text-red-400">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <button 
+                                        onClick={() => addSet(exercise.id)}
+                                        className="w-full mt-4 py-2 flex items-center justify-center gap-2 text-sm text-emerald-400 bg-emerald-400/10 rounded-lg hover:bg-emerald-400/20 transition-colors"
+                                    >
+                                        <Plus size={16} /> Добавить подход
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                  );
+              })}
           </div>
 
           <button 
