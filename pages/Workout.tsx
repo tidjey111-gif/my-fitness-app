@@ -426,7 +426,7 @@ const WorkoutPage: React.FC = () => {
 
           <div className="space-y-6">
               {currentLog.exercises.map((exercise, index) => {
-                  const isExpanded = expandedExercises[exercise.id] ?? true;
+                  const isExpanded = expandedExercises[exercise.id] ?? false; // Changed from true to false
                   const isEditing = editingExerciseId === exercise.id;
 
                   return (
