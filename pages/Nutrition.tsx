@@ -370,10 +370,12 @@ const NutritionPage: React.FC = () => {
               setPer100g(calculatePer100g(itemData));
               setShowAiInput(false); // Close the input after success
               setAiQuery('');
+          } else {
+              alert('Не удалось распознать блюдо. Попробуйте описать подробнее или проверить соединение.');
           }
       } catch (e) {
           console.error(e);
-          alert('Не удалось обработать запрос. Попробуйте еще раз.');
+          alert('Ошибка соединения с AI. Попробуйте еще раз.');
       } finally {
           setIsAnalyzing(false);
       }
@@ -408,12 +410,15 @@ const NutritionPage: React.FC = () => {
           };
           setFormData(itemData);
           setPer100g(calculatePer100g(itemData));
+        } else {
+             alert('Не удалось распознать изображение. Попробуйте другое фото.');
         }
         setIsAnalyzing(false);
       };
       reader.readAsDataURL(file);
     } catch (e) {
       console.error(e);
+      alert('Ошибка при обработке изображения.');
       setIsAnalyzing(false);
     }
   };

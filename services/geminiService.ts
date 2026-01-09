@@ -30,7 +30,7 @@ const foodAnalysisSchema = {
 export const analyzeFoodImage = async (base64Image: string): Promise<AnalyzedFood | null> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: {
         parts: [
           {
@@ -63,7 +63,7 @@ export const analyzeFoodImage = async (base64Image: string): Promise<AnalyzedFoo
 export const analyzeFoodText = async (text: string): Promise<AnalyzedFood | null> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: {
         parts: [
           {
