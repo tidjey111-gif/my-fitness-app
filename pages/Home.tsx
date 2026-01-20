@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../App';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, Tooltip } from 'recharts';
-import { Activity, Flame, Trophy, Plus, ChevronRight, Settings, Target, Award, X, Download, Upload, Flag, RotateCcw } from 'lucide-react';
+import { Activity, Flame, Trophy, Plus, ChevronRight, Settings, Target, Award, X, Download, Upload, Flag, RotateCcw, Calendar } from 'lucide-react';
 import { Tab, UserProfile, MacroGoal, AppState } from '../types';
 
 // --- Sub-components ---
@@ -418,8 +418,6 @@ const HomePage: React.FC = () => {
     }
   };
 
-  const todaysWorkout = workoutLogs[selectedDate];
-
   const getCalendarGrid = () => {
     const now = new Date(selectedDate);
     const year = now.getFullYear();
@@ -588,50 +586,6 @@ const HomePage: React.FC = () => {
         onReset={() => setIsSettingsOpen(true)}
       />
 
-      {/* Today's Workout - Modern & Detailed Style with Gym Background */}
-      <div 
-        className="border border-white/5 rounded-3xl p-6 backdrop-blur-sm relative overflow-hidden shadow-xl group h-auto min-h-[160px] bg-cover bg-center cursor-pointer" 
-        onClick={() => setTab(Tab.WORKOUT)}
-        style={{ 
-            backgroundImage: 'linear-gradient(to bottom right, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.85)), url("https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop")' 
-        }}
-      >
-          <div className="flex justify-between items-start mb-4 relative z-10">
-             <div>
-                <h2 className="text-lg font-semibold mb-1 flex items-center gap-3">
-                    <div className="p-2 bg-emerald-500/10 rounded-xl backdrop-blur-md border border-emerald-500/20">
-                        <Trophy className="text-emerald-500" size={20} /> 
-                    </div>
-                    Сегодняшняя тренировка
-                </h2>
-                <p className="text-slate-400 text-sm ml-11">
-                    {todaysWorkout ? todaysWorkout.name : "День отдыха или не запланировано"}
-                </p>
-             </div>
-             <button className="p-2 bg-slate-800/50 rounded-xl text-slate-400 group-hover:text-emerald-400 group-hover:bg-emerald-500/10 transition-all backdrop-blur-md">
-                 <ChevronRight size={20} />
-             </button>
-          </div>
-          
-          <div className="mt-2 space-y-3 relative z-10">
-              {todaysWorkout && todaysWorkout.exercises.length > 0 ? (
-                  todaysWorkout.exercises.map((ex, i) => (
-                      <div key={i} className="bg-slate-950/40 rounded-xl p-3 border border-white/5 backdrop-blur-sm hover:bg-slate-950/60 transition-colors">
-                          <div className="text-sm font-bold text-emerald-400 mb-1">{ex.name}</div>
-                          <div className="text-xs text-slate-300 font-mono leading-relaxed break-words">
-                              {ex.sets.map(s => `${s.weight}кг-${s.reps}`).join(', ')}
-                          </div>
-                      </div>
-                  ))
-              ) : (
-                  <div className="flex flex-col items-center justify-center py-6 text-slate-500 text-sm border-2 border-dashed border-slate-700/50 rounded-xl bg-slate-950/30">
-                      <span>Нет упражнений</span>
-                      <span className="text-xs mt-1 text-slate-600">Нажмите, чтобы добавить</span>
-                  </div>
-              )}
-          </div>
-      </div>
-
       {/* Mini Calendar - Modern Style */}
       <div 
         className="border border-white/5 rounded-3xl p-6 shadow-xl relative overflow-hidden bg-cover bg-center"
@@ -676,7 +630,7 @@ const HomePage: React.FC = () => {
       {/* Weight Log Modal */}
       {isWeightModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-scaleIn">
+          <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-3xl p-6 w-full max-sm shadow-2xl animate-scaleIn">
             <h3 className="text-xl font-bold mb-6 text-white">Записать вес</h3>
             <div className="space-y-5">
               <div>
