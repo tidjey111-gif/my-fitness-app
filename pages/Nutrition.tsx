@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../App';
 import { Camera, Search, Plus, X, Loader2, Save, Calendar, ChevronLeft, ChevronRight, Copy, Edit2, Trash2, Check, Utensils, Sparkles } from 'lucide-react';
-import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
+import { analyzeFoodImage, analyzeFoodText, generateFoodThumbnail } from '../services/geminiService';
 import { FoodItem, FoodLog, MealType } from '../types';
 import { getWeekDays } from '../utils';
 
@@ -355,20 +355,27 @@ const NutritionPage: React.FC = () => {
       if (!aiQuery.trim()) return;
       setIsAnalyzing(true);
       try {
+          // 1. Analyze nutritional content
           const result = await analyzeFoodText(aiQuery);
           if (result) {
+              const foodName = result.foodName || aiQuery;
+              
+              // 2. Automatically generate a thumbnail for this food
+              const generatedImage = await generateFoodThumbnail(foodName);
+              
               const itemData = {
                   ...formData,
-                  name: result.foodName || aiQuery,
+                  name: foodName,
                   calories: result.calories || 0,
                   protein: result.protein || 0,
                   fat: result.fat || 0,
                   carbs: result.carbs || 0,
-                  grams: result.estimatedWeightGrams || 100
+                  grams: result.estimatedWeightGrams || 100,
+                  image: generatedImage || undefined
               };
               setFormData(itemData);
               setPer100g(calculatePer100g(itemData));
-              setShowAiInput(false); // Close the input after success
+              setShowAiInput(false); 
               setAiQuery('');
           } else {
               alert('Не удалось распознать блюдо. Попробуйте описать подробнее или проверить соединение.');
