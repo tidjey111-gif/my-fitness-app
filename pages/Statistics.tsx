@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { useApp } from '../App';
 import { 
@@ -8,11 +9,10 @@ import {
 } from 'lucide-react';
 
 // --- Custom Tooltip ---
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     const value = payload[0].value;
-    const name = payload[0].name;
     const unit = payload[0].unit;
 
     return (
@@ -78,12 +78,11 @@ const StatCard: React.FC<{
 const StatisticsPage: React.FC = () => {
   const { weightHistory, foodLogs, workoutLogs } = useApp();
 
-  // --- Data Processing (Last 10 Days) ---
-  const { data, averages } = useMemo(() => {
+  // --- Data Processing for Calendar Charts (Last 10 Days) ---
+  const { calendarData, calorieAvg, weightTrendInfo } = useMemo(() => {
       const dates = [];
       const today = new Date();
       
-      // Generate last 10 days
       for(let i=9; i>=0; i--) {
           const d = new Date(today);
           d.setDate(today.getDate() - i);
@@ -92,27 +91,18 @@ const StatisticsPage: React.FC = () => {
           dates.push(localISODate);
       }
 
-      // Process Data Points
       let totalCals = 0;
-      let totalVol = 0;
-      let weightCount = 0;
       let calorieCount = 0;
-      let volumeCount = 0;
 
-      // Find first and last weight for trend
       const validWeights = weightHistory.filter(w => dates.includes(w.date));
       const startWeight = validWeights.length > 0 ? validWeights[0].weight : 0;
       const endWeight = validWeights.length > 0 ? validWeights[validWeights.length - 1].weight : 0;
       const weightDiff = endWeight - startWeight;
 
-      const processedData = dates.map(date => {
-          // Date Formatting
+      const processed = dates.map(date => {
           const [y, m, d] = date.split('-').map(Number);
           const dateObj = new Date(y, m - 1, d);
-          const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-          const shortDate = dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-
-          // Weight
+          
           let weight = null;
           const exactWeight = weightHistory.find(w => w.date === date);
           if (exactWeight) {
@@ -121,9 +111,7 @@ const StatisticsPage: React.FC = () => {
               const prev = [...weightHistory].sort((a,b) => a.date.localeCompare(b.date)).filter(w => w.date < date);
               if (prev.length > 0) weight = prev[prev.length - 1].weight;
           }
-          if (weight) weightCount++;
 
-          // Calories
           const foodLog = foodLogs[date];
           const calories = foodLog ? foodLog.items.reduce((a, b) => a + b.calories, 0) : 0;
           if (calories > 0) {
@@ -131,38 +119,62 @@ const StatisticsPage: React.FC = () => {
               calorieCount++;
           }
 
-          // Volume
-          const workLog = workoutLogs[date];
-          let volume = 0;
-          if (workLog) {
-              workLog.exercises.forEach(ex => {
-                  ex.sets.forEach(s => volume += (s.weight * s.reps));
-              });
-          }
-          if (volume > 0) {
-              totalVol += volume;
-              volumeCount++;
-          }
-
           return {
               date,
-              formattedDate,
-              shortDate,
+              formattedDate: dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }),
+              shortDate: dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
               weight,
-              calories,
-              volume
+              calories
           };
       });
 
       return {
-          data: processedData,
-          averages: {
-              avgCalories: calorieCount > 0 ? Math.round(totalCals / calorieCount) : 0,
-              totalVolume: totalVol,
-              weightTrend: weightDiff
+          calendarData: processed,
+          calorieAvg: calorieCount > 0 ? Math.round(totalCals / calorieCount) : 0,
+          weightTrendInfo: {
+              current: endWeight,
+              diff: weightDiff
           }
       };
-  }, [weightHistory, foodLogs, workoutLogs]);
+  }, [weightHistory, foodLogs]);
+
+  // --- Data Processing for Workout Volume (Last 10 WORKOUTS) ---
+  const workoutVolumeInfo = useMemo(() => {
+    // Get all dates from logs and sort them
+    const allWorkoutDates = Object.keys(workoutLogs).sort((a, b) => a.localeCompare(b));
+    
+    // Map to volume data and filter out zero-volume days
+    const sessions = allWorkoutDates.map(date => {
+        const log = workoutLogs[date];
+        let volume = 0;
+        if (log) {
+            log.exercises.forEach(ex => {
+                ex.sets.forEach(s => volume += (s.weight * s.reps));
+            });
+        }
+        
+        if (volume === 0) return null;
+
+        const [y, m, d] = date.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+
+        return {
+            date,
+            formattedDate: dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }),
+            shortDate: dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+            volume
+        };
+    }).filter(s => s !== null);
+
+    // Take the last 10 actual workouts
+    const lastTenWorkouts = sessions.slice(-10);
+    const totalVolumePeriod = lastTenWorkouts.reduce((acc, curr) => acc + curr!.volume, 0);
+
+    return {
+        data: lastTenWorkouts,
+        totalVolume: totalVolumePeriod
+    };
+  }, [workoutLogs]);
 
   return (
     <div className="relative min-h-screen">
@@ -182,22 +194,22 @@ const StatisticsPage: React.FC = () => {
                     <h1 className="text-2xl font-bold text-white">Статистика</h1>
                     <div className="flex items-center gap-2 text-slate-400 text-sm mt-1">
                         <CalendarRange size={14} />
-                        <span>Последние 10 дней</span>
+                        <span>История активности</span>
                     </div>
                 </div>
             </div>
 
-            {/* Weight Chart */}
+            {/* Weight Chart (Calendar-based) */}
             <StatCard 
                 title="Динамика веса" 
                 icon={<Scale size={16} className="text-purple-400"/>}
-                mainValue={`${data[data.length-1]?.weight || '-'} кг`}
-                subValue={averages.weightTrend !== 0 ? `${averages.weightTrend > 0 ? '+' : ''}${averages.weightTrend.toFixed(1)} кг` : undefined}
-                trend={averages.weightTrend > 0 ? 'up' : averages.weightTrend < 0 ? 'down' : 'neutral'}
+                mainValue={`${weightTrendInfo.current || '-'} кг`}
+                subValue={weightTrendInfo.diff !== 0 ? `${weightTrendInfo.diff > 0 ? '+' : ''}${weightTrendInfo.diff.toFixed(1)} кг` : undefined}
+                trend={weightTrendInfo.diff > 0 ? 'up' : weightTrendInfo.diff < 0 ? 'down' : 'neutral'}
                 colorClass="bg-purple-500"
             >
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data}>
+                    <AreaChart data={calendarData}>
                         <defs>
                             <linearGradient id="gradWeight" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#a855f7" stopOpacity={0.5}/>
@@ -223,16 +235,16 @@ const StatisticsPage: React.FC = () => {
                 </ResponsiveContainer>
             </StatCard>
 
-            {/* Calories Chart */}
+            {/* Calories Chart (Calendar-based) */}
             <StatCard 
                 title="Калорийность" 
                 icon={<Flame size={16} className="text-emerald-400"/>}
-                mainValue={`${averages.avgCalories}`}
+                mainValue={`${calorieAvg}`}
                 subValue="ккал / день (среднее)"
                 colorClass="bg-emerald-500"
             >
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data} barSize={12}>
+                    <BarChart data={calendarData} barSize={12}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                         <XAxis dataKey="shortDate" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} tickMargin={10} />
                         <Tooltip 
@@ -240,7 +252,7 @@ const StatisticsPage: React.FC = () => {
                             content={<CustomTooltip />}
                         />
                         <Bar dataKey="calories" name="Калории" unit="ккал" radius={[4, 4, 0, 0]}>
-                            {data.map((entry, index) => (
+                            {calendarData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.calories > 2500 ? '#ef4444' : '#10b981'} />
                             ))}
                         </Bar>
@@ -248,16 +260,16 @@ const StatisticsPage: React.FC = () => {
                 </ResponsiveContainer>
             </StatCard>
 
-            {/* Volume Chart */}
+            {/* Volume Chart (Last 10 WORKOUTS) */}
             <StatCard 
                 title="Тоннаж тренировок" 
                 icon={<Dumbbell size={16} className="text-blue-400"/>}
-                mainValue={(averages.totalVolume / 1000).toFixed(1) + ' т'}
-                subValue="всего за период"
+                mainValue={(workoutVolumeInfo.totalVolume / 1000).toFixed(1) + ' т'}
+                subValue="за 10 последних занятий"
                 colorClass="bg-blue-500"
             >
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data}>
+                    <AreaChart data={workoutVolumeInfo.data}>
                         <defs>
                             <linearGradient id="gradVol" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.5}/>
@@ -265,7 +277,13 @@ const StatisticsPage: React.FC = () => {
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                        <XAxis dataKey="shortDate" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} tickMargin={10} />
+                        <XAxis 
+                            dataKey="shortDate" 
+                            tick={{fontSize: 10, fill: '#64748b'}} 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tickMargin={10}
+                        />
                         <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }} />
                         <Area 
                             type="monotone" 
